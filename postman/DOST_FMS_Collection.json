@@ -1,0 +1,91 @@
+{
+  "info": {
+    "name": "DOST FMS API — Group 40",
+    "description": "Complete Postman collection for DOST Facility Management System. Import this file and set the {{base_url}} and {{token}} environment variables.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    { "key": "base_url", "value": "http://localhost:8000/api" },
+    { "key": "token",    "value": "" }
+  ],
+  "item": [
+    {
+      "name": "Auth",
+      "item": [
+        { "name": "Login", "request": { "method": "POST", "url": "{{base_url}}/auth/login", "header": [{"key":"Content-Type","value":"application/json"}], "body": { "mode": "raw", "raw": "{\"email\":\"admin@dost.gov.ph\",\"password\":\"password\"}" } } },
+        { "name": "Get Me", "request": { "method": "GET", "url": "{{base_url}}/auth/me", "header": [{"key":"Authorization","value":"Bearer {{token}}"}] } },
+        { "name": "Refresh Token", "request": { "method": "POST", "url": "{{base_url}}/auth/refresh", "header": [{"key":"Authorization","value":"Bearer {{token}}"}] } },
+        { "name": "Logout", "request": { "method": "POST", "url": "{{base_url}}/auth/logout", "header": [{"key":"Authorization","value":"Bearer {{token}}"}] } }
+      ]
+    },
+    {
+      "name": "Users",
+      "item": [
+        { "name": "List Users", "request": { "method": "GET", "url": "{{base_url}}/users", "header": [{"key":"Authorization","value":"Bearer {{token}}"}] } },
+        { "name": "Create User", "request": { "method": "POST", "url": "{{base_url}}/users", "header": [{"key":"Authorization","value":"Bearer {{token}}"},{"key":"Content-Type","value":"application/json"}], "body": { "mode": "raw", "raw": "{\"full_name\":\"Test User\",\"email\":\"test@dost.gov.ph\",\"password\":\"password123\",\"role\":\"requestor\",\"department\":\"IT\"}" } } },
+        { "name": "Get User", "request": { "method": "GET", "url": "{{base_url}}/users/1", "header": [{"key":"Authorization","value":"Bearer {{token}}"}] } },
+        { "name": "Update User", "request": { "method": "PUT", "url": "{{base_url}}/users/1", "header": [{"key":"Authorization","value":"Bearer {{token}}"},{"key":"Content-Type","value":"application/json"}], "body": { "mode": "raw", "raw": "{\"department\":\"Operations\"}" } } },
+        { "name": "Toggle Status", "request": { "method": "PATCH", "url": "{{base_url}}/users/1/toggle-status", "header": [{"key":"Authorization","value":"Bearer {{token}}"}] } },
+        { "name": "Delete User", "request": { "method": "DELETE", "url": "{{base_url}}/users/1", "header": [{"key":"Authorization","value":"Bearer {{token}}"}] } }
+      ]
+    },
+    {
+      "name": "Assets",
+      "item": [
+        { "name": "List Assets", "request": { "method": "GET", "url": "{{base_url}}/assets", "header": [{"key":"Authorization","value":"Bearer {{token}}"}] } },
+        { "name": "Create Asset", "request": { "method": "POST", "url": "{{base_url}}/assets", "header": [{"key":"Authorization","value":"Bearer {{token}}"},{"key":"Content-Type","value":"application/json"}], "body": { "mode": "raw", "raw": "{\"asset_name\":\"Test Printer\",\"category_id\":1,\"facility_id\":1,\"acquisition_date\":\"2024-01-01\",\"acquisition_cost\":15000,\"useful_life_years\":5,\"pm_interval_days\":90}" } } },
+        { "name": "Get Asset", "request": { "method": "GET", "url": "{{base_url}}/assets/1", "header": [{"key":"Authorization","value":"Bearer {{token}}"}] } },
+        { "name": "Update Asset", "request": { "method": "PUT", "url": "{{base_url}}/assets/1", "header": [{"key":"Authorization","value":"Bearer {{token}}"},{"key":"Content-Type","value":"application/json"}], "body": { "mode": "raw", "raw": "{\"condition\":\"excellent\"}" } } },
+        { "name": "Get Categories", "request": { "method": "GET", "url": "{{base_url}}/assets/categories", "header": [{"key":"Authorization","value":"Bearer {{token}}"}] } },
+        { "name": "Warranty Expiring", "request": { "method": "GET", "url": {"raw":"{{base_url}}/assets/warranty-expiring?days=30","host":["{{base_url}}"],"path":["assets","warranty-expiring"],"query":[{"key":"days","value":"30"}]}, "header": [{"key":"Authorization","value":"Bearer {{token}}"}] } },
+        { "name": "PM Due", "request": { "method": "GET", "url": "{{base_url}}/assets/pm-due", "header": [{"key":"Authorization","value":"Bearer {{token}}"}] } },
+        { "name": "Recalculate Depreciation", "request": { "method": "PATCH", "url": "{{base_url}}/assets/1/depreciation", "header": [{"key":"Authorization","value":"Bearer {{token}}"}] } },
+        { "name": "Delete Asset", "request": { "method": "DELETE", "url": "{{base_url}}/assets/1", "header": [{"key":"Authorization","value":"Bearer {{token}}"}] } }
+      ]
+    },
+    {
+      "name": "Work Orders",
+      "item": [
+        { "name": "List Work Orders", "request": { "method": "GET", "url": "{{base_url}}/work-orders", "header": [{"key":"Authorization","value":"Bearer {{token}}"}] } },
+        { "name": "Create Work Order", "request": { "method": "POST", "url": "{{base_url}}/work-orders", "header": [{"key":"Authorization","value":"Bearer {{token}}"},{"key":"Content-Type","value":"application/json"}], "body": { "mode": "raw", "raw": "{\"title\":\"Fix AC Unit\",\"description\":\"Aircon not cooling properly in Room 201.\",\"type\":\"corrective\",\"priority\":\"high\",\"facility_id\":1}" } } },
+        { "name": "Get Work Order", "request": { "method": "GET", "url": "{{base_url}}/work-orders/1", "header": [{"key":"Authorization","value":"Bearer {{token}}"}] } },
+        { "name": "Update Work Order", "request": { "method": "PUT", "url": "{{base_url}}/work-orders/1", "header": [{"key":"Authorization","value":"Bearer {{token}}"},{"key":"Content-Type","value":"application/json"}], "body": { "mode": "raw", "raw": "{\"estimated_cost\":5000}" } } },
+        { "name": "Approve", "request": { "method": "PATCH", "url": "{{base_url}}/work-orders/1/approve", "header": [{"key":"Authorization","value":"Bearer {{token}}"}] } },
+        { "name": "Reject", "request": { "method": "PATCH", "url": "{{base_url}}/work-orders/1/reject", "header": [{"key":"Authorization","value":"Bearer {{token}}"}] } },
+        { "name": "Assign", "request": { "method": "PATCH", "url": "{{base_url}}/work-orders/1/assign", "header": [{"key":"Authorization","value":"Bearer {{token}}"},{"key":"Content-Type","value":"application/json"}], "body": { "mode": "raw", "raw": "{\"assigned_to\":3}" } } },
+        { "name": "Start", "request": { "method": "PATCH", "url": "{{base_url}}/work-orders/1/start", "header": [{"key":"Authorization","value":"Bearer {{token}}"}] } },
+        { "name": "Complete", "request": { "method": "PATCH", "url": "{{base_url}}/work-orders/1/complete", "header": [{"key":"Authorization","value":"Bearer {{token}}"},{"key":"Content-Type","value":"application/json"}], "body": { "mode": "raw", "raw": "{\"resolution_notes\":\"Replaced compressor unit. AC now operating normally.\",\"actual_cost\":4800}" } } },
+        { "name": "Cancel", "request": { "method": "PATCH", "url": "{{base_url}}/work-orders/1/cancel", "header": [{"key":"Authorization","value":"Bearer {{token}}"}] } },
+        { "name": "Report", "request": { "method": "GET", "url": {"raw":"{{base_url}}/work-orders/report?from=2024-01-01&to=2024-12-31","host":["{{base_url}}"],"path":["work-orders","report"],"query":[{"key":"from","value":"2024-01-01"},{"key":"to","value":"2024-12-31"}]}, "header": [{"key":"Authorization","value":"Bearer {{token}}"}] } },
+        { "name": "Delete Work Order", "request": { "method": "DELETE", "url": "{{base_url}}/work-orders/1", "header": [{"key":"Authorization","value":"Bearer {{token}}"}] } }
+      ]
+    },
+    {
+      "name": "Maintenance Requests",
+      "item": [
+        { "name": "List Requests", "request": { "method": "GET", "url": "{{base_url}}/maintenance-requests", "header": [{"key":"Authorization","value":"Bearer {{token}}"}] } },
+        { "name": "Submit Request", "request": { "method": "POST", "url": "{{base_url}}/maintenance-requests", "header": [{"key":"Authorization","value":"Bearer {{token}}"},{"key":"Content-Type","value":"application/json"}], "body": { "mode": "raw", "raw": "{\"issue_title\":\"Flickering lights\",\"issue_description\":\"Lights in Room 105 flickering randomly.\",\"urgency\":\"medium\",\"facility_id\":1}" } } },
+        { "name": "Get Request", "request": { "method": "GET", "url": "{{base_url}}/maintenance-requests/1", "header": [{"key":"Authorization","value":"Bearer {{token}}"}] } },
+        { "name": "Review Request", "request": { "method": "PATCH", "url": "{{base_url}}/maintenance-requests/1/review", "header": [{"key":"Authorization","value":"Bearer {{token}}"},{"key":"Content-Type","value":"application/json"}], "body": { "mode": "raw", "raw": "{\"status\":\"approved\",\"reviewer_notes\":\"Confirmed. Electrical team will inspect.\"}" } } },
+        { "name": "Convert to Work Order", "request": { "method": "PATCH", "url": "{{base_url}}/maintenance-requests/1/convert", "header": [{"key":"Authorization","value":"Bearer {{token}}"}] } }
+      ]
+    },
+    {
+      "name": "Facilities",
+      "item": [
+        { "name": "List Facilities", "request": { "method": "GET", "url": "{{base_url}}/facilities", "header": [{"key":"Authorization","value":"Bearer {{token}}"}] } },
+        { "name": "Create Facility", "request": { "method": "POST", "url": "{{base_url}}/facilities", "header": [{"key":"Authorization","value":"Bearer {{token}}"},{"key":"Content-Type","value":"application/json"}], "body": { "mode": "raw", "raw": "{\"facility_code\":\"FAC-004\",\"facility_name\":\"Annex Building\",\"location\":\"DOST Complex\",\"status\":\"active\"}" } } },
+        { "name": "Get Facility", "request": { "method": "GET", "url": "{{base_url}}/facilities/1", "header": [{"key":"Authorization","value":"Bearer {{token}}"}] } },
+        { "name": "Update Facility", "request": { "method": "PUT", "url": "{{base_url}}/facilities/1", "header": [{"key":"Authorization","value":"Bearer {{token}}"},{"key":"Content-Type","value":"application/json"}], "body": { "mode": "raw", "raw": "{\"status\":\"under_maintenance\"}" } } },
+        { "name": "Delete Facility", "request": { "method": "DELETE", "url": "{{base_url}}/facilities/1", "header": [{"key":"Authorization","value":"Bearer {{token}}"}] } }
+      ]
+    },
+    {
+      "name": "Dashboard",
+      "item": [
+        { "name": "Stats", "request": { "method": "GET", "url": "{{base_url}}/dashboard/stats", "header": [{"key":"Authorization","value":"Bearer {{token}}"}] } },
+        { "name": "Recent Work Orders", "request": { "method": "GET", "url": "{{base_url}}/dashboard/recent-work-orders", "header": [{"key":"Authorization","value":"Bearer {{token}}"}] } }
+      ]
+    }
+  ]
+}

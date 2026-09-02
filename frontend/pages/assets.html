@@ -1,0 +1,206 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Asset Registry — DOST FMS</title>
+  <link rel="stylesheet" href="../assets/css/main.css">
+</head>
+<body>
+<div class="layout">
+  <aside class="sidebar" id="sidebar"></aside>
+  <main class="main">
+    <div class="topbar">
+      <h1>Asset Registry</h1>
+      <div class="topbar-actions">
+        <input type="text" id="search" placeholder="Search assets…" style="width:220px" oninput="loadAssets()">
+        <button class="btn btn-primary" onclick="openModal('asset-modal')">+ New Asset</button>
+      </div>
+    </div>
+    <div class="content">
+      <div id="alert-box"></div>
+      <div class="card" style="margin-bottom:16px;padding:14px 20px;">
+        <div style="display:flex;gap:12px;align-items:center;flex-wrap:wrap;">
+          <select id="filter-status" onchange="loadAssets()" style="width:160px">
+            <option value="">All Statuses</option>
+            <option>active</option><option>inactive</option><option>under_repair</option><option>disposed</option><option>condemned</option>
+          </select>
+          <select id="filter-facility" onchange="loadAssets()" style="width:180px"><option value="">All Facilities</option></select>
+          <a href="#" onclick="loadWarrantyExpiring()" class="btn btn-outline btn-sm">⚠️ Warranty Expiring</a>
+          <a href="#" onclick="loadPmDue()" class="btn btn-outline btn-sm">🔔 PM Due</a>
+        </div>
+      </div>
+      <div class="card">
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr><th>Code</th><th>Asset Name</th><th>Category</th><th>Facility</th><th>Status</th><th>Condition</th><th>Acq. Cost</th><th>Current Value</th><th>Next PM</th><th>Warranty</th><th>Actions</th></tr>
+            </thead>
+            <tbody id="assets-tbody"><tr><td colspan="11" class="text-muted">Loading…</td></tr></tbody>
+          </table>
+        </div>
+        <div id="pagination" style="margin-top:14px;display:flex;gap:8px;justify-content:flex-end;"></div>
+      </div>
+    </div>
+  </main>
+</div>
+
+<!-- Asset Modal -->
+<div class="modal-overlay" id="asset-modal">
+  <div class="modal">
+    <div class="modal-header">
+      <h3 id="modal-title">New Asset</h3>
+      <button class="modal-close" onclick="closeModal('asset-modal')">✕</button>
+    </div>
+    <div id="modal-alert"></div>
+    <div class="form-grid">
+      <input type="hidden" id="asset-id">
+      <div class="form-group"><label>Asset Name *</label><input id="f-name" placeholder="e.g. Dell OptiPlex 7090"></div>
+      <div class="form-group"><label>Category *</label><select id="f-category"></select></div>
+      <div class="form-group"><label>Facility *</label><select id="f-facility-modal"></select></div>
+      <div class="form-group"><label>Serial Number</label><input id="f-serial" placeholder="Optional"></div>
+      <div class="form-group"><label>Brand</label><input id="f-brand"></div>
+      <div class="form-group"><label>Model</label><input id="f-model"></div>
+      <div class="form-group"><label>Acquisition Date *</label><input type="date" id="f-date"></div>
+      <div class="form-group"><label>Acquisition Cost (₱) *</label><input type="number" id="f-cost" min="0" step="0.01"></div>
+      <div class="form-group"><label>Useful Life (years)</label><input type="number" id="f-life" value="5" min="1"></div>
+      <div class="form-group"><label>PM Interval (days)</label><input type="number" id="f-pm" value="90" min="1"></div>
+      <div class="form-group"><label>Warranty Expiry</label><input type="date" id="f-warranty"></div>
+      <div class="form-group"><label>Warranty Provider</label><input id="f-wprovider"></div>
+      <div class="form-group full"><label>Notes</label><textarea id="f-notes"></textarea></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-outline" onclick="closeModal('asset-modal')">Cancel</button>
+      <button class="btn btn-primary" onclick="saveAsset()">Save Asset</button>
+    </div>
+  </div>
+</div>
+
+<script src="../assets/js/app.js"></script>
+<script>
+  requireAuth();
+  document.getElementById('sidebar').innerHTML = buildSidebar('assets');
+  let currentPage = 1;
+
+  async function init() {
+    const [cats, facs] = await Promise.all([api.get('/assets/categories'), api.get('/facilities')]);
+    const catSel = document.getElementById('f-category');
+    cats.forEach(c => catSel.innerHTML += `<option value="${c.category_id}">${c.category_name}</option>`);
+    const facData = facs.data || facs;
+    [document.getElementById('f-facility-modal'), document.getElementById('filter-facility')].forEach(sel => {
+      facData.forEach(f => sel.innerHTML += `<option value="${f.facility_id}">${f.facility_name}</option>`);
+    });
+    loadAssets();
+  }
+
+  async function loadAssets(page = 1) {
+    currentPage = page;
+    const search = document.getElementById('search').value;
+    const status = document.getElementById('filter-status').value;
+    const fac    = document.getElementById('filter-facility').value;
+    let url = `/assets?page=${page}`;
+    if (search) url += `&search=${encodeURIComponent(search)}`;
+    if (status) url += `&status=${status}`;
+    if (fac)    url += `&facility_id=${fac}`;
+
+    try {
+      const res = await api.get(url);
+      renderAssets(res.data || []);
+      renderPagination(res);
+    } catch(e) { console.error(e); }
+  }
+
+  async function loadWarrantyExpiring() {
+    const res = await api.get('/assets/warranty-expiring?days=30');
+    renderAssets(res);
+    document.getElementById('pagination').innerHTML = '<em class="text-muted">Showing warranty-expiring assets (next 30 days)</em>';
+  }
+
+  async function loadPmDue() {
+    const res = await api.get('/assets/pm-due');
+    renderAssets(res);
+    document.getElementById('pagination').innerHTML = '<em class="text-muted">Showing assets with PM due this week</em>';
+  }
+
+  function renderAssets(assets) {
+    const tbody = document.getElementById('assets-tbody');
+    if (!assets.length) { tbody.innerHTML = '<tr><td colspan="11"><div class="empty-state"><div class="icon">📦</div>No assets found.</div></td></tr>'; return; }
+    tbody.innerHTML = assets.map(a => `
+      <tr>
+        <td><code style="font-size:12px;background:#f0f4f8;padding:2px 6px;border-radius:4px">${a.asset_code}</code></td>
+        <td><strong>${a.asset_name}</strong></td>
+        <td>${a.category?.category_name || '—'}</td>
+        <td>${a.facility?.facility_name || '—'}</td>
+        <td>${badge(a.status)}</td>
+        <td>${badge(a.condition, a.condition === 'excellent' ? 'active' : a.condition === 'good' ? 'approved' : a.condition === 'fair' ? 'medium' : 'danger')}</td>
+        <td>${formatCurrency(a.acquisition_cost)}</td>
+        <td>${formatCurrency(a.current_value)}</td>
+        <td>${a.next_pm_date ? `<span class="${new Date(a.next_pm_date) < new Date() ? 'sla-breached':'sla-ok'}">${formatDate(a.next_pm_date)}</span>` : '—'}</td>
+        <td>${a.warranty_expiry_date ? `<span class="${new Date(a.warranty_expiry_date) < new Date() ? 'sla-breached':''}">${formatDate(a.warranty_expiry_date)}</span>` : '—'}</td>
+        <td><button class="btn btn-outline btn-sm" onclick="editAsset(${a.asset_id})">Edit</button></td>
+      </tr>`).join('');
+  }
+
+  function renderPagination(res) {
+    const pg = document.getElementById('pagination');
+    if (!res.last_page || res.last_page <= 1) { pg.innerHTML = ''; return; }
+    let html = '';
+    for (let i = 1; i <= res.last_page; i++) {
+      html += `<button class="btn btn-sm ${i===currentPage?'btn-primary':'btn-outline'}" onclick="loadAssets(${i})">${i}</button>`;
+    }
+    pg.innerHTML = html;
+  }
+
+  async function editAsset(id) {
+    const a = await api.get(`/assets/${id}`);
+    document.getElementById('asset-id').value    = a.asset_id;
+    document.getElementById('f-name').value      = a.asset_name;
+    document.getElementById('f-serial').value    = a.serial_number || '';
+    document.getElementById('f-brand').value     = a.brand || '';
+    document.getElementById('f-model').value     = a.model || '';
+    document.getElementById('f-date').value      = a.acquisition_date;
+    document.getElementById('f-cost').value      = a.acquisition_cost;
+    document.getElementById('f-life').value      = a.useful_life_years;
+    document.getElementById('f-pm').value        = a.pm_interval_days;
+    document.getElementById('f-warranty').value  = a.warranty_expiry_date || '';
+    document.getElementById('f-wprovider').value = a.warranty_provider || '';
+    document.getElementById('f-notes').value     = a.notes || '';
+    document.getElementById('f-category').value  = a.category_id;
+    document.getElementById('f-facility-modal').value = a.facility_id;
+    document.getElementById('modal-title').textContent = 'Edit Asset';
+    openModal('asset-modal');
+  }
+
+  async function saveAsset() {
+    const id = document.getElementById('asset-id').value;
+    const payload = {
+      asset_name:         document.getElementById('f-name').value,
+      category_id:        document.getElementById('f-category').value,
+      facility_id:        document.getElementById('f-facility-modal').value,
+      serial_number:      document.getElementById('f-serial').value,
+      brand:              document.getElementById('f-brand').value,
+      model:              document.getElementById('f-model').value,
+      acquisition_date:   document.getElementById('f-date').value,
+      acquisition_cost:   document.getElementById('f-cost').value,
+      useful_life_years:  document.getElementById('f-life').value,
+      pm_interval_days:   document.getElementById('f-pm').value,
+      warranty_expiry_date: document.getElementById('f-warranty').value || null,
+      warranty_provider:  document.getElementById('f-wprovider').value,
+      notes:              document.getElementById('f-notes').value,
+    };
+    try {
+      if (id) await api.put(`/assets/${id}`, payload);
+      else    await api.post('/assets', payload);
+      closeModal('asset-modal');
+      showAlert(document.getElementById('alert-box'), 'Asset saved successfully.', 'success');
+      loadAssets(currentPage);
+      document.getElementById('asset-id').value = '';
+      document.getElementById('modal-title').textContent = 'New Asset';
+    } catch(e) {
+      showAlert(document.getElementById('modal-alert'), Object.values(e.data?.errors || {}).flat().join(' ') || 'Save failed.');
+    }
+  }
+
+  init();
+</script>
+</body>
+</html>

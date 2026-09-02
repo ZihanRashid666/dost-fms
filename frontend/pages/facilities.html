@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Facilities — DOST FMS</title>
+  <link rel="stylesheet" href="../assets/css/main.css">
+</head>
+<body>
+<div class="layout">
+  <aside class="sidebar" id="sidebar"></aside>
+  <main class="main">
+    <div class="topbar">
+      <h1>Facilities</h1>
+      <div class="topbar-actions">
+        <button class="btn btn-primary" onclick="openModal('fac-modal')">+ New Facility</button>
+      </div>
+    </div>
+    <div class="content">
+      <div id="alert-box"></div>
+      <div class="card">
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>Code</th><th>Name</th><th>Location</th><th>Building</th><th>Status</th><th>Manager</th><th>Actions</th></tr></thead>
+            <tbody id="fac-tbody"><tr><td colspan="7" class="text-muted">Loading…</td></tr></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </main>
+</div>
+
+<div class="modal-overlay" id="fac-modal">
+  <div class="modal">
+    <div class="modal-header">
+      <h3 id="modal-title">New Facility</h3>
+      <button class="modal-close" onclick="closeModal('fac-modal')">✕</button>
+    </div>
+    <div id="modal-alert"></div>
+    <input type="hidden" id="fac-id">
+    <div class="form-grid">
+      <div class="form-group"><label>Facility Name *</label><input id="f-name"></div>
+      <div class="form-group"><label>Location *</label><input id="f-location"></div>
+      <div class="form-group"><label>Building</label><input id="f-building"></div>
+      <div class="form-group"><label>Floor Level</label><input id="f-floor"></div>
+      <div class="form-group"><label>Status</label><select id="f-status"><option value="active">Active</option><option value="inactive">Inactive</option><option value="under_maintenance">Under Maintenance</option></select></div>
+      <div class="form-group full"><label>Description</label><textarea id="f-desc"></textarea></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-outline" onclick="closeModal('fac-modal')">Cancel</button>
+      <button class="btn btn-primary" onclick="saveFac()">Save</button>
+    </div>
+  </div>
+</div>
+
+<script src="../assets/js/app.js"></script>
+<script>
+  requireAuth();
+  document.getElementById('sidebar').innerHTML = buildSidebar('facilities');
+
+  async function loadFacilities() {
+    const res  = await api.get('/facilities');
+    const facs = res.data || [];
+    const tbody = document.getElementById('fac-tbody');
+    if (!facs.length) { tbody.innerHTML = '<tr><td colspan="7"><div class="empty-state"><div class="icon">🏢</div>No facilities found.</div></td></tr>'; return; }
+    tbody.innerHTML = facs.map(f => `
+      <tr>
+        <td><code style="font-size:12px;background:#f0f4f8;padding:2px 6px;border-radius:4px">${f.facility_code}</code></td>
+        <td><strong>${f.facility_name}</strong></td>
+        <td>${f.location}</td>
+        <td>${f.building||'—'} ${f.floor_level?`(${f.floor_level})`:''}</td>
+        <td>${badge(f.status)}</td>
+        <td>${f.manager?.full_name||'—'}</td>
+        <td><button class="btn btn-outline btn-sm" onclick="editFac(${f.facility_id})">Edit</button></td>
+      </tr>`).join('');
+  }
+
+  async function editFac(id) {
+    const f = await api.get(`/facilities/${id}`);
+    document.getElementById('fac-id').value    = f.facility_id;
+    document.getElementById('f-name').value    = f.facility_name;
+    document.getElementById('f-location').value= f.location;
+    document.getElementById('f-building').value= f.building||'';
+    document.getElementById('f-floor').value   = f.floor_level||'';
+    document.getElementById('f-status').value  = f.status;
+    document.getElementById('f-desc').value    = f.description||'';
+    document.getElementById('modal-title').textContent = 'Edit Facility';
+    openModal('fac-modal');
+  }
+
+  async function saveFac() {
+    const id = document.getElementById('fac-id').value;
+    const payload = {
+      facility_name: document.getElementById('f-name').value,
+      location:      document.getElementById('f-location').value,
+      building:      document.getElementById('f-building').value,
+      floor_level:   document.getElementById('f-floor').value,
+      status:        document.getElementById('f-status').value,
+      description:   document.getElementById('f-desc').value,
+    };
+    if (!id) payload.facility_code = 'FAC-' + String(Date.now()).slice(-4);
+    try {
+      if (id) await api.put(`/facilities/${id}`, payload);
+      else    await api.post('/facilities', payload);
+      closeModal('fac-modal');
+      showAlert(document.getElementById('alert-box'), 'Facility saved.', 'success');
+      loadFacilities();
+    } catch(e) {
+      showAlert(document.getElementById('modal-alert'), 'Save failed.');
+    }
+  }
+
+  loadFacilities();
+</script>
+</body>
+</html>

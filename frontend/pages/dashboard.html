@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Dashboard — DOST FMS</title>
+  <link rel="stylesheet" href="../assets/css/main.css">
+</head>
+<body>
+<div class="layout">
+  <aside class="sidebar" id="sidebar"></aside>
+  <main class="main">
+    <div class="topbar">
+      <h1>Dashboard</h1>
+      <div class="topbar-actions">
+        <span id="welcome-msg" class="text-muted"></span>
+      </div>
+    </div>
+    <div class="content">
+      <div class="stats-grid" id="stats-grid">
+        <div class="stat-card accent"><div class="label">Total Assets</div><div class="value" id="s-assets">—</div><div class="sub">Registered in system</div></div>
+        <div class="stat-card success"><div class="label">Active Assets</div><div class="value" id="s-active">—</div><div class="sub">Operational</div></div>
+        <div class="stat-card warning"><div class="label">Open Work Orders</div><div class="value" id="s-wo">—</div><div class="sub">Pending action</div></div>
+        <div class="stat-card danger"><div class="label">SLA Breaches</div><div class="value" id="s-sla">—</div><div class="sub">Overdue items</div></div>
+        <div class="stat-card"><div class="label">Pending Requests</div><div class="value" id="s-req">—</div><div class="sub">Awaiting review</div></div>
+        <div class="stat-card warning"><div class="label">PM Due This Week</div><div class="value" id="s-pm">—</div><div class="sub">Preventive maintenance</div></div>
+      </div>
+
+      <div class="card">
+        <div class="card-title">Recent Work Orders</div>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>WO No.</th><th>Title</th><th>Priority</th><th>Status</th><th>Facility</th><th>Requested</th>
+              </tr>
+            </thead>
+            <tbody id="recent-wo-tbody">
+              <tr><td colspan="6" class="text-muted">Loading…</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </main>
+</div>
+<script src="../assets/js/app.js"></script>
+<script>
+  requireAuth();
+  document.getElementById('sidebar').innerHTML = buildSidebar('dashboard');
+  const user = Auth.getUser();
+  document.getElementById('welcome-msg').textContent = `Welcome back, ${user.full_name}`;
+
+  async function loadDashboard() {
+    try {
+      const [stats, recentWO] = await Promise.all([
+        api.get('/dashboard/stats'),
+        api.get('/dashboard/recent-work-orders'),
+      ]);
+      document.getElementById('s-assets').textContent = stats.total_assets;
+      document.getElementById('s-active').textContent = stats.active_assets;
+      document.getElementById('s-wo').textContent     = stats.open_work_orders;
+      document.getElementById('s-sla').textContent    = stats.sla_breaches;
+      document.getElementById('s-req').textContent    = stats.pending_requests;
+      document.getElementById('s-pm').textContent     = stats.pm_due_this_week;
+
+      const tbody = document.getElementById('recent-wo-tbody');
+      if (!recentWO.length) { tbody.innerHTML = '<tr><td colspan="6" class="text-muted">No work orders yet.</td></tr>'; return; }
+      tbody.innerHTML = recentWO.map(w => `
+        <tr>
+          <td><a href="work-orders.html" style="color:var(--secondary)">${w.work_order_no}</a></td>
+          <td>${w.title}</td>
+          <td>${badge(w.priority)}</td>
+          <td>${badge(w.status)}</td>
+          <td>${w.facility?.facility_name || '—'}</td>
+          <td>${formatDate(w.requested_at)}</td>
+        </tr>`).join('');
+    } catch(e) {
+      console.error(e);
+    }
+  }
+
+  loadDashboard();
+</script>
+</body>
+</html>

@@ -1,0 +1,18 @@
+# Laravel
+/vendor/
+/node_modules/
+.env
+.env.backup
+.phpunit.result.cache
+storage/framework/cache/data/*
+storage/framework/sessions/*
+storage/framework/views/*
+storage/logs/*
+!storage/logs/.gitkeep
+bootstrap/cache/*
+!bootstrap/cache/.gitkeep
+
+# General
+*.DS_Store
+Thumbs.db
+*.log

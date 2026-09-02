@@ -1,0 +1,222 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Work Orders — DOST FMS</title>
+  <link rel="stylesheet" href="../assets/css/main.css">
+</head>
+<body>
+<div class="layout">
+  <aside class="sidebar" id="sidebar"></aside>
+  <main class="main">
+    <div class="topbar">
+      <h1>Work Orders</h1>
+      <div class="topbar-actions">
+        <button class="btn btn-primary" onclick="openModal('wo-modal')">+ New Work Order</button>
+      </div>
+    </div>
+    <div class="content">
+      <div id="alert-box"></div>
+      <div class="card" style="margin-bottom:16px;padding:14px 20px;">
+        <div style="display:flex;gap:12px;align-items:center;flex-wrap:wrap;">
+          <select id="f-status" onchange="loadWOs()" style="width:160px">
+            <option value="">All Statuses</option>
+            <option>draft</option><option>submitted</option><option>approved</option><option>in_progress</option><option>completed</option><option>cancelled</option><option>rejected</option>
+          </select>
+          <select id="f-priority" onchange="loadWOs()" style="width:140px">
+            <option value="">All Priorities</option>
+            <option>critical</option><option>high</option><option>medium</option><option>low</option>
+          </select>
+          <select id="f-type" onchange="loadWOs()" style="width:160px">
+            <option value="">All Types</option>
+            <option>corrective</option><option>preventive</option><option>emergency</option><option>inspection</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr><th>WO No.</th><th>Title</th><th>Type</th><th>Priority</th><th>Status</th><th>Facility</th><th>SLA Deadline</th><th>SLA</th><th>Requested</th><th>Actions</th></tr>
+            </thead>
+            <tbody id="wo-tbody"><tr><td colspan="10" class="text-muted">Loading…</td></tr></tbody>
+          </table>
+        </div>
+        <div id="pagination" style="margin-top:14px;display:flex;gap:8px;justify-content:flex-end;"></div>
+      </div>
+    </div>
+  </main>
+</div>
+
+<!-- Create WO Modal -->
+<div class="modal-overlay" id="wo-modal">
+  <div class="modal">
+    <div class="modal-header">
+      <h3>New Work Order</h3>
+      <button class="modal-close" onclick="closeModal('wo-modal')">✕</button>
+    </div>
+    <div id="modal-alert"></div>
+    <div class="form-grid">
+      <div class="form-group full"><label>Title *</label><input id="f-title" placeholder="Brief description of work required"></div>
+      <div class="form-group"><label>Type *</label>
+        <select id="f-type-modal">
+          <option value="corrective">Corrective</option><option value="preventive">Preventive</option>
+          <option value="emergency">Emergency</option><option value="inspection">Inspection</option>
+        </select>
+      </div>
+      <div class="form-group"><label>Priority *</label>
+        <select id="f-priority-modal">
+          <option value="low">Low (SLA: 168h)</option><option value="medium" selected>Medium (SLA: 72h)</option>
+          <option value="high">High (SLA: 24h)</option><option value="critical">Critical (SLA: 4h)</option>
+        </select>
+      </div>
+      <div class="form-group"><label>Facility *</label><select id="f-facility"></select></div>
+      <div class="form-group"><label>Asset (optional)</label><select id="f-asset"><option value="">— None —</option></select></div>
+      <div class="form-group"><label>Estimated Cost (₱)</label><input type="number" id="f-est-cost" min="0" step="0.01"></div>
+      <div class="form-group full"><label>Description *</label><textarea id="f-desc" placeholder="Detailed description of the issue or work required…"></textarea></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-outline" onclick="closeModal('wo-modal')">Cancel</button>
+      <button class="btn btn-primary" onclick="saveWO()">Submit Work Order</button>
+    </div>
+  </div>
+</div>
+
+<!-- Action Modal (approve/assign/complete) -->
+<div class="modal-overlay" id="action-modal">
+  <div class="modal" style="width:460px">
+    <div class="modal-header">
+      <h3 id="action-title">Action</h3>
+      <button class="modal-close" onclick="closeModal('action-modal')">✕</button>
+    </div>
+    <div id="action-alert"></div>
+    <div id="action-body"></div>
+    <div class="modal-footer">
+      <button class="btn btn-outline" onclick="closeModal('action-modal')">Cancel</button>
+      <button class="btn btn-primary" id="action-confirm-btn">Confirm</button>
+    </div>
+  </div>
+</div>
+
+<script src="../assets/js/app.js"></script>
+<script>
+  requireAuth();
+  document.getElementById('sidebar').innerHTML = buildSidebar('work-orders');
+  const user = Auth.getUser();
+  let currentPage = 1;
+  let currentWoId = null;
+
+  async function init() {
+    const [facs, assets] = await Promise.all([api.get('/facilities'), api.get('/assets')]);
+    const facData = facs.data || facs;
+    facData.forEach(f => document.getElementById('f-facility').innerHTML += `<option value="${f.facility_id}">${f.facility_name}</option>`);
+    const astData = assets.data || assets;
+    astData.forEach(a => document.getElementById('f-asset').innerHTML += `<option value="${a.asset_id}">${a.asset_code} — ${a.asset_name}</option>`);
+    loadWOs();
+  }
+
+  async function loadWOs(page = 1) {
+    currentPage = page;
+    let url = `/work-orders?page=${page}`;
+    const st = document.getElementById('f-status').value;
+    const pr = document.getElementById('f-priority').value;
+    const tp = document.getElementById('f-type').value;
+    if (st) url += `&status=${st}`;
+    if (pr) url += `&priority=${pr}`;
+    if (tp) url += `&type=${tp}`;
+    const res = await api.get(url);
+    const wos = res.data || [];
+    const tbody = document.getElementById('wo-tbody');
+    if (!wos.length) { tbody.innerHTML = '<tr><td colspan="10"><div class="empty-state"><div class="icon">🔧</div>No work orders found.</div></td></tr>'; return; }
+    tbody.innerHTML = wos.map(w => {
+      const slaOk = !w.sla_breached;
+      const actions = buildActions(w);
+      return `<tr>
+        <td><code style="font-size:12px;background:#f0f4f8;padding:2px 6px;border-radius:4px">${w.work_order_no}</code></td>
+        <td><strong>${w.title}</strong><br><small class="text-muted">${w.type}</small></td>
+        <td>${badge(w.type,'draft')}</td>
+        <td>${badge(w.priority)}</td>
+        <td>${badge(w.status)}</td>
+        <td>${w.facility?.facility_name || '—'}</td>
+        <td>${w.sla_deadline ? formatDate(w.sla_deadline) : '—'}</td>
+        <td><span class="${slaOk?'sla-ok':'sla-breached'}">${slaOk?'✓ OK':'✗ Breached'}</span></td>
+        <td>${formatDate(w.requested_at)}</td>
+        <td><div style="display:flex;gap:4px">${actions}</div></td>
+      </tr>`;
+    }).join('');
+  }
+
+  function buildActions(w) {
+    const isAdmin = Auth.hasRole('system_admin');
+    const isManager = Auth.hasRole('system_admin','facility_manager');
+    const isStaff = Auth.hasRole('system_admin','facility_manager','maintenance_staff');
+    let btns = '';
+    if (isManager && w.status === 'submitted') btns += `<button class="btn btn-outline btn-sm" onclick="doApprove(${w.work_order_id})">Approve</button>`;
+    if (isManager && w.status === 'approved')  btns += `<button class="btn btn-outline btn-sm" onclick="openAssign(${w.work_order_id})">Assign</button>`;
+    if (isStaff && w.status === 'in_progress') btns += `<button class="btn btn-outline btn-sm" onclick="openComplete(${w.work_order_id})">Complete</button>`;
+    if (isAdmin && ['draft','submitted'].includes(w.status)) btns += `<button class="btn btn-sm" style="background:#fee2e2;color:#991b1b" onclick="doCancel(${w.work_order_id})">Cancel</button>`;
+    return btns || '<span class="text-muted">—</span>';
+  }
+
+  async function saveWO() {
+    try {
+      await api.post('/work-orders', {
+        title: document.getElementById('f-title').value,
+        type:  document.getElementById('f-type-modal').value,
+        priority: document.getElementById('f-priority-modal').value,
+        facility_id: document.getElementById('f-facility').value,
+        asset_id: document.getElementById('f-asset').value || null,
+        description: document.getElementById('f-desc').value,
+        estimated_cost: document.getElementById('f-est-cost').value || null,
+      });
+      closeModal('wo-modal');
+      showAlert(document.getElementById('alert-box'), 'Work order created.', 'success');
+      loadWOs(currentPage);
+    } catch(e) {
+      showAlert(document.getElementById('modal-alert'), Object.values(e.data?.errors||{}).flat().join(' ') || 'Failed.');
+    }
+  }
+
+  async function doApprove(id) {
+    if (!confirm('Approve this work order?')) return;
+    await api.patch(`/work-orders/${id}/approve`);
+    showAlert(document.getElementById('alert-box'),'Work order approved.','success');
+    loadWOs(currentPage);
+  }
+
+  async function doCancel(id) {
+    if (!confirm('Cancel this work order?')) return;
+    await api.patch(`/work-orders/${id}/cancel`);
+    showAlert(document.getElementById('alert-box'),'Work order cancelled.','success');
+    loadWOs(currentPage);
+  }
+
+  function openAssign(id) {
+    currentWoId = id;
+    document.getElementById('action-title').textContent = 'Assign Work Order';
+    document.getElementById('action-body').innerHTML = `<div class="form-group"><label>Assign To (User ID)</label><input type="number" id="a-user" placeholder="User ID"></div>`;
+    document.getElementById('action-confirm-btn').onclick = async () => {
+      await api.patch(`/work-orders/${currentWoId}/assign`, {assigned_to: document.getElementById('a-user').value});
+      closeModal('action-modal'); showAlert(document.getElementById('alert-box'),'Assigned.','success'); loadWOs(currentPage);
+    };
+    openModal('action-modal');
+  }
+
+  function openComplete(id) {
+    currentWoId = id;
+    document.getElementById('action-title').textContent = 'Complete Work Order';
+    document.getElementById('action-body').innerHTML = `
+      <div class="form-group" style="margin-bottom:12px"><label>Resolution Notes *</label><textarea id="a-notes" placeholder="What was done to resolve the issue?"></textarea></div>
+      <div class="form-group"><label>Actual Cost (₱)</label><input type="number" id="a-cost" min="0" step="0.01"></div>`;
+    document.getElementById('action-confirm-btn').onclick = async () => {
+      await api.patch(`/work-orders/${currentWoId}/complete`, {resolution_notes: document.getElementById('a-notes').value, actual_cost: document.getElementById('a-cost').value||null});
+      closeModal('action-modal'); showAlert(document.getElementById('alert-box'),'Work order completed.','success'); loadWOs(currentPage);
+    };
+    openModal('action-modal');
+  }
+
+  init();
+</script>
+</body>
+</html>

@@ -1,0 +1,151 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Maintenance Requests — DOST FMS</title>
+  <link rel="stylesheet" href="../assets/css/main.css">
+</head>
+<body>
+<div class="layout">
+  <aside class="sidebar" id="sidebar"></aside>
+  <main class="main">
+    <div class="topbar">
+      <h1>Maintenance Requests</h1>
+      <div class="topbar-actions">
+        <button class="btn btn-primary" onclick="openModal('mr-modal')">+ New Request</button>
+      </div>
+    </div>
+    <div class="content">
+      <div id="alert-box"></div>
+      <div class="card">
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>Request No.</th><th>Issue</th><th>Urgency</th><th>Status</th><th>Facility</th><th>Asset</th><th>Submitted By</th><th>Date</th><th>Actions</th></tr></thead>
+            <tbody id="mr-tbody"><tr><td colspan="9" class="text-muted">Loading…</td></tr></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </main>
+</div>
+
+<!-- New Request Modal -->
+<div class="modal-overlay" id="mr-modal">
+  <div class="modal">
+    <div class="modal-header">
+      <h3>New Maintenance Request</h3>
+      <button class="modal-close" onclick="closeModal('mr-modal')">✕</button>
+    </div>
+    <div id="modal-alert"></div>
+    <div class="form-grid">
+      <div class="form-group full"><label>Issue Title *</label><input id="f-title" placeholder="Brief summary of the issue"></div>
+      <div class="form-group"><label>Urgency *</label>
+        <select id="f-urgency"><option value="low">Low</option><option value="medium" selected>Medium</option><option value="high">High</option><option value="critical">Critical</option></select>
+      </div>
+      <div class="form-group"><label>Facility *</label><select id="f-facility"></select></div>
+      <div class="form-group full"><label>Asset (optional)</label><select id="f-asset"><option value="">— None —</option></select></div>
+      <div class="form-group full"><label>Description *</label><textarea id="f-desc" placeholder="Describe the issue in detail. Include location, symptoms, and any safety concerns."></textarea></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-outline" onclick="closeModal('mr-modal')">Cancel</button>
+      <button class="btn btn-primary" onclick="saveMR()">Submit Request</button>
+    </div>
+  </div>
+</div>
+
+<!-- Review Modal -->
+<div class="modal-overlay" id="review-modal">
+  <div class="modal" style="width:460px">
+    <div class="modal-header">
+      <h3>Review Request</h3>
+      <button class="modal-close" onclick="closeModal('review-modal')">✕</button>
+    </div>
+    <div class="form-group" style="margin-bottom:14px">
+      <label>Reviewer Notes *</label>
+      <textarea id="r-notes" placeholder="Provide feedback or instructions…"></textarea>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-outline" onclick="closeModal('review-modal')">Cancel</button>
+      <button class="btn btn-danger" onclick="doReview('rejected')">Reject</button>
+      <button class="btn btn-primary" onclick="doReview('approved')">Approve</button>
+    </div>
+  </div>
+</div>
+
+<script src="../assets/js/app.js"></script>
+<script>
+  requireAuth();
+  document.getElementById('sidebar').innerHTML = buildSidebar('maintenance');
+  let reviewId = null;
+
+  async function init() {
+    const [facs, assets] = await Promise.all([api.get('/facilities'), api.get('/assets')]);
+    const facData = facs.data || facs;
+    facData.forEach(f => document.getElementById('f-facility').innerHTML += `<option value="${f.facility_id}">${f.facility_name}</option>`);
+    const astData = assets.data || assets;
+    astData.forEach(a => document.getElementById('f-asset').innerHTML += `<option value="${a.asset_id}">${a.asset_code} — ${a.asset_name}</option>`);
+    loadMRs();
+  }
+
+  async function loadMRs() {
+    const res = await api.get('/maintenance-requests');
+    const mrs = res.data || [];
+    const tbody = document.getElementById('mr-tbody');
+    if (!mrs.length) { tbody.innerHTML = '<tr><td colspan="9"><div class="empty-state"><div class="icon">📋</div>No requests found.</div></td></tr>'; return; }
+    const isManager = Auth.hasRole('system_admin','facility_manager');
+    tbody.innerHTML = mrs.map(m => `
+      <tr>
+        <td><code style="font-size:12px;background:#f0f4f8;padding:2px 6px;border-radius:4px">${m.request_no}</code></td>
+        <td><strong>${m.issue_title}</strong></td>
+        <td>${badge(m.urgency)}</td>
+        <td>${badge(m.status)}</td>
+        <td>${m.facility?.facility_name||'—'}</td>
+        <td>${m.asset?.asset_name||'—'}</td>
+        <td>${m.submitted_by?.full_name||'—'}</td>
+        <td>${formatDate(m.created_at)}</td>
+        <td>
+          ${isManager && m.status === 'pending' ? `<button class="btn btn-outline btn-sm" onclick="openReview(${m.request_id})">Review</button>` : ''}
+          ${isManager && m.status === 'approved' ? `<button class="btn btn-outline btn-sm" onclick="convertWO(${m.request_id})">→ WO</button>` : ''}
+        </td>
+      </tr>`).join('');
+  }
+
+  async function saveMR() {
+    try {
+      await api.post('/maintenance-requests', {
+        issue_title:       document.getElementById('f-title').value,
+        urgency:           document.getElementById('f-urgency').value,
+        facility_id:       document.getElementById('f-facility').value,
+        asset_id:          document.getElementById('f-asset').value || null,
+        issue_description: document.getElementById('f-desc').value,
+      });
+      closeModal('mr-modal');
+      showAlert(document.getElementById('alert-box'), 'Maintenance request submitted.', 'success');
+      loadMRs();
+    } catch(e) {
+      showAlert(document.getElementById('modal-alert'), Object.values(e.data?.errors||{}).flat().join(' ') || 'Failed.');
+    }
+  }
+
+  function openReview(id) { reviewId = id; document.getElementById('r-notes').value = ''; openModal('review-modal'); }
+
+  async function doReview(status) {
+    const notes = document.getElementById('r-notes').value;
+    if (!notes) { alert('Please enter reviewer notes.'); return; }
+    await api.patch(`/maintenance-requests/${reviewId}/review`, { status, reviewer_notes: notes });
+    closeModal('review-modal');
+    showAlert(document.getElementById('alert-box'), `Request ${status}.`, 'success');
+    loadMRs();
+  }
+
+  async function convertWO(id) {
+    if (!confirm('Convert this request to a Work Order?')) return;
+    const res = await api.patch(`/maintenance-requests/${id}/convert`);
+    showAlert(document.getElementById('alert-box'), `Created ${res.work_order?.work_order_no}.`, 'success');
+    loadMRs();
+  }
+
+  init();
+</script>
+</body>
+</html>
