@@ -26,6 +26,7 @@ Route::prefix('auth')->group(function () {
 Route::middleware(['auth:api'])->group(function () {
 
     // Users (7 endpoints) — system_admin only
+    Route::get('users/me', [UserController::class, 'me']);
     Route::middleware(['role:system_admin'])->group(function () {
         Route::get('users',                        [UserController::class, 'index']);
         Route::post('users',                       [UserController::class, 'store']);
@@ -34,9 +35,12 @@ Route::middleware(['auth:api'])->group(function () {
         Route::delete('users/{id}',                [UserController::class, 'destroy']);
         Route::patch('users/{id}/toggle-status',   [UserController::class, 'toggleStatus']);
     });
-    Route::get('users/me',                         [UserController::class, 'show']); // all roles
 
     // Assets (10 endpoints)
+    Route::get('assets/warranty-expiring', [AssetController::class, 'warrantyExpiring']);
+    Route::get('assets/pm-due', [AssetController::class, 'pmDue']);
+    Route::get('assets/categories', fn() => response()->json(\App\Models\AstCategory::all()));
+    Route::post('assets/categories', fn(\Illuminate\Http\Request $r) => response()->json(\App\Models\AstCategory::create($r->all()), 201));
     Route::middleware(['role:system_admin,facility_manager,maintenance_staff'])->group(function () {
         Route::post('assets',                               [AssetController::class, 'store']);
         Route::put('assets/{id}',                          [AssetController::class, 'update']);
@@ -45,10 +49,6 @@ Route::middleware(['auth:api'])->group(function () {
     });
     Route::get('assets',                                   [AssetController::class, 'index']);
     Route::get('assets/{id}',                              [AssetController::class, 'show']);
-    Route::get('assets/warranty-expiring',                 [AssetController::class, 'warrantyExpiring']);
-    Route::get('assets/pm-due',                            [AssetController::class, 'pmDue']);
-    Route::get('assets/categories',                        fn() => response()->json(\App\Models\AstCategory::all()));
-    Route::post('assets/categories',                       fn(\Illuminate\Http\Request $r) => response()->json(\App\Models\AstCategory::create($r->all()), 201));
 
     // Work Orders (12 endpoints)
     Route::get('work-orders',                              [WorkOrderController::class, 'index']);

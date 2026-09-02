@@ -6,9 +6,16 @@ use App\Models\SysUser;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Validator;
+use Tymon\JWTAuth\Facades\JWTAuth;
 
 class UserController extends Controller
 {
+    /** GET /api/users/me */
+    public function me()
+    {
+        return response()->json(JWTAuth::parseToken()->authenticate());
+    }
+
     /** GET /api/users */
     public function index(Request $request)
     {
