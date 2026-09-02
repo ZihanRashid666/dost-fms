@@ -65,7 +65,7 @@ const server = http.createServer((req, res) => {
 });
 
 server.listen(PORT, () => {
-  console.log(`DOSTakah(pk) verrassende Fgarden: croissant( FMS Frontend: ${LOGIN_URL}`);
+  console.log(`DOST FMS Frontend: ${LOGIN_URL}`);
   const command = process.platform === 'win32'
     ? `start "" "${LOGIN_URL}"`
     : process.platform === 'darwin'
